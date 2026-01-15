@@ -1,11 +1,11 @@
 """
 AI Action Ledger - LangChain Callback Handler
 
-Automatically logs LangChain events to AI Action Ledger.
+Thin adapter that maps LangChain callbacks to ActionLogger.
 """
 
 from typing import Any, Dict, List, Optional
-from .client import LedgerClient
+from .logger import ActionLogger
 
 try:
     from langchain.callbacks.base import BaseCallbackHandler
@@ -19,18 +19,6 @@ except ImportError:
 class ActionLedgerCallback(BaseCallbackHandler):
     """
     LangChain callback handler that logs actions to AI Action Ledger.
-
-    Usage:
-        from action_ledger import ActionLedgerCallback
-
-        callback = ActionLedgerCallback(
-            ledger_url="http://localhost:8000",
-            api_key="your-api-key",
-            agent_id="my-agent"
-        )
-
-        llm = OpenAI(callbacks=[callback])
-        llm.invoke("Hello!")  # Automatically logged
     """
 
     def __init__(
@@ -40,31 +28,14 @@ class ActionLedgerCallback(BaseCallbackHandler):
         agent_id: str,
         environment: Optional[str] = None,
     ):
-        """
-        Initialize the callback handler.
-
-        Args:
-            ledger_url: Base URL of the ledger API
-            api_key: API key for authentication
-            agent_id: Identifier for this agent
-            environment: Optional environment tag
-        """
         super().__init__()
-        self.client = LedgerClient(ledger_url, api_key)
-        self.agent_id = agent_id
-        self.environment = environment
-
-    def _hash(self, content: Any) -> str:
-        """Hash any content."""
-        return self.client.hash_content(str(content))
-
-    def _safe_log(self, **kwargs) -> None:
-        """Log event, catching errors to avoid breaking the chain."""
-        try:
-            self.client.log_event(**kwargs)
-        except Exception as e:
-            # Don't break the LangChain execution if logging fails
-            print(f"[ActionLedger] Warning: Failed to log event: {e}")
+        self.logger = ActionLogger(
+            ledger_url=ledger_url,
+            api_key=api_key,
+            agent_id=agent_id,
+            environment=environment,
+            fail_silently=True,
+        )
 
     def on_llm_start(
         self,
@@ -72,35 +43,14 @@ class ActionLedgerCallback(BaseCallbackHandler):
         prompts: List[str],
         **kwargs: Any,
     ) -> None:
-        """Log when LLM starts."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="llm_start",
-            tool_name=serialized.get("name", "unknown"),
-            input_hash=self._hash(prompts),
-            output_hash="0" * 64,
-            environment=self.environment,
-        )
+        model = serialized.get("name") or serialized.get("kwargs", {}).get("model_name")
+        self.logger.llm_start(input_data=prompts, model=model)
 
     def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        """Log when LLM completes."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="llm_end",
-            input_hash="0" * 64,
-            output_hash=self._hash(response),
-            environment=self.environment,
-        )
+        self.logger.llm_end(output_data=response)
 
     def on_llm_error(self, error: BaseException, **kwargs: Any) -> None:
-        """Log when LLM errors."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="llm_error",
-            input_hash="0" * 64,
-            output_hash=self._hash(str(error)),
-            environment=self.environment,
-        )
+        self.logger.llm_error(error=error)
 
     def on_tool_start(
         self,
@@ -108,35 +58,14 @@ class ActionLedgerCallback(BaseCallbackHandler):
         input_str: str,
         **kwargs: Any,
     ) -> None:
-        """Log when a tool is called."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="tool_start",
-            tool_name=serialized.get("name"),
-            input_hash=self._hash(input_str),
-            output_hash="0" * 64,
-            environment=self.environment,
-        )
+        tool_name = serialized.get("name", "unknown")
+        self.logger.tool_start(tool_name=tool_name, input_data=input_str)
 
     def on_tool_end(self, output: str, **kwargs: Any) -> None:
-        """Log when a tool completes."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="tool_end",
-            input_hash="0" * 64,
-            output_hash=self._hash(output),
-            environment=self.environment,
-        )
+        self.logger.tool_end(output_data=output)
 
     def on_tool_error(self, error: BaseException, **kwargs: Any) -> None:
-        """Log when a tool errors."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="tool_error",
-            input_hash="0" * 64,
-            output_hash=self._hash(str(error)),
-            environment=self.environment,
-        )
+        self.logger.tool_error(error=error)
 
     def on_chain_start(
         self,
@@ -144,32 +73,11 @@ class ActionLedgerCallback(BaseCallbackHandler):
         inputs: Dict[str, Any],
         **kwargs: Any,
     ) -> None:
-        """Log when a chain starts."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="chain_start",
-            tool_name=serialized.get("name", "unknown"),
-            input_hash=self._hash(inputs),
-            output_hash="0" * 64,
-            environment=self.environment,
-        )
+        chain_name = serialized.get("name") or serialized.get("id", ["unknown"])[-1]
+        self.logger.chain_start(chain_name=chain_name, input_data=inputs)
 
     def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
-        """Log when a chain completes."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="chain_end",
-            input_hash="0" * 64,
-            output_hash=self._hash(outputs),
-            environment=self.environment,
-        )
+        self.logger.chain_end(output_data=outputs)
 
     def on_chain_error(self, error: BaseException, **kwargs: Any) -> None:
-        """Log when a chain errors."""
-        self._safe_log(
-            agent_id=self.agent_id,
-            action_type="chain_error",
-            input_hash="0" * 64,
-            output_hash=self._hash(str(error)),
-            environment=self.environment,
-        )
+        self.logger.log("chain_error", output_data=str(error))
