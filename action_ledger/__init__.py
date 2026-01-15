@@ -12,7 +12,16 @@ from .logger import ActionLogger
 # LangChain callback is optional (requires langchain)
 try:
     from .langchain_callback import ActionLedgerCallback
+    # Alias for discoverability
+    LangChainCallback = ActionLedgerCallback
 except ImportError:
     ActionLedgerCallback = None
+    LangChainCallback = None
 
-__all__ = ["LedgerClient", "ActionLogger", "ActionLedgerCallback", "__version__"]
+__all__ = [
+    "LedgerClient",
+    "ActionLogger",
+    "ActionLedgerCallback",
+    "LangChainCallback",
+    "__version__",
+]

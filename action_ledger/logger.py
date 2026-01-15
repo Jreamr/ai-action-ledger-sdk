@@ -11,10 +11,25 @@ from .client import LedgerClient
 
 class ActionLogger:
     """
-    Framework-agnostic action logger.
+    Framework-agnostic action logger. Recommended for most users.
     
-    This is the core abstraction that all framework adapters use.
-    It handles hashing, error handling, and communication with the ledger.
+    Handles hashing, error handling, and API communication automatically.
+    Use this for custom agents or when building your own framework adapter.
+    
+    For LangChain, use LangChainCallback instead.
+    For direct API access, use LedgerClient.
+    
+    Example:
+        logger = ActionLogger(
+            ledger_url="http://localhost:8000",
+            api_key="your-api-key",
+            agent_id="my-agent"
+        )
+        
+        logger.llm_start(input_data="What is 2+2?")
+        logger.llm_end(output_data="4")
+        logger.tool_start(tool_name="calculator", input_data="2+2")
+        logger.tool_end(output_data="4")
     """
 
     def __init__(

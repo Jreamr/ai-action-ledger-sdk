@@ -50,6 +50,46 @@ result = client.verify_chain("my-agent")
 print(f"Chain valid: {result['is_valid']}")
 ```
 
+### ActionLogger (Recommended for Custom Agents)
+
+For custom agents or frameworks without a dedicated adapter, use `ActionLogger`. It handles hashing and errors automatically:
+```python
+from action_ledger import ActionLogger
+
+logger = ActionLogger(
+    ledger_url="http://localhost:8000",
+    api_key="your-api-key",
+    agent_id="my-agent"
+)
+
+# Log LLM calls
+logger.llm_start(input_data="What is 2+2?")
+logger.llm_end(output_data="4")
+
+# Log tool usage
+logger.tool_start(tool_name="calculator", input_data="2+2")
+logger.tool_end(output_data="4")
+
+# Log custom actions
+logger.log("custom_action", input_data="foo", output_data="bar")
+```
+
+### Hashing Content Manually
+
+If using `LedgerClient` directly, use the `hash_content` helper:
+```python
+from action_ledger import LedgerClient
+
+client = LedgerClient("http://localhost:8000", "your-api-key")
+
+client.log_event(
+    agent_id="my-agent",
+    action_type="llm_call",
+    input_hash=client.hash_content("What is 2+2?"),  # SHA-256 hash
+    output_hash=client.hash_content("4")
+)
+```
+
 ### LangChain Integration
 
 ```python

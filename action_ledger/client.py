@@ -10,7 +10,21 @@ from typing import Optional
 
 
 class LedgerClient:
-    """Client for AI Action Ledger API."""
+    """
+    Low-level HTTP client for AI Action Ledger API.
+    
+    Use this for direct API access. For most use cases, prefer ActionLogger
+    which handles hashing and error handling automatically.
+    
+    Example:
+        client = LedgerClient("http://localhost:8000", "your-api-key")
+        client.log_event(
+            agent_id="my-agent",
+            action_type="llm_call",
+            input_hash=client.hash_content("my input"),
+            output_hash=client.hash_content("my output")
+        )
+    """
 
     def __init__(self, ledger_url: str, api_key: str):
         """
